@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Random Encounter Generator — Basic Fantasy RPG</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #fff;
+    color: #000;
+    font-family: Georgia, serif;
+    font-size: 15px;
+    line-height: 1.5;
+    padding: 2rem 1rem 4rem;
+  }
+
+  .page {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ── */
+  h1 {
+    font-size: 1.4rem;
+    font-weight: bold;
+    border-bottom: 2px solid #000;
+    padding-bottom: .35rem;
+    margin-bottom: .2rem;
+  }
+  .subtitle {
+    font-size: .8rem;
+    color: #444;
+    margin-bottom: 1.6rem;
+  }
+
+  /* ── Section heading ── */
+  h2 {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .13em;
+    border-bottom: 1px solid #000;
+    padding-bottom: .2rem;
+    margin-bottom: .8rem;
+  }
+
+  /* ── Encounter rows ── */
+  #encounter-rows { display: flex; flex-direction: column; gap: .45rem; margin-bottom: .55rem; }
+
+  .encounter-row {
+    display: flex; align-items: center; gap: .5rem;
+    padding: .35rem .5rem;
+    border: 1px solid #ccc;
+  }
+
+  .encounter-row label {
+    font-size: .72rem;
+    color: #555;
+    white-space: nowrap;
+  }
+
+  select, input[type="text"] {
+    font-family: Georgia, serif;
+    font-size: .9rem;
+    color: #000;
+    background: #fff;
+    border: 1px solid #000;
+    padding: .22rem .4rem;
+    outline: none;
+  }
+  select:focus, input[type="text"]:focus {
+    outline: 2px solid #000;
+    outline-offset: -2px;
+  }
+  select { flex: 1; min-width: 0; cursor: pointer; }
+  .qty-input { width: 80px; text-align: center; }
+
+  .del-btn {
+    background: none;
+    border: 1px solid #000;
+    cursor: pointer;
+    font-family: Georgia, serif;
+    font-size: .78rem;
+    padding: .15rem .4rem;
+    color: #000;
+  }
+  .del-btn:hover { background: #000; color: #fff; }
+
+  /* ── Hints ── */
+  .hint { font-size: .77rem; color: #555; font-style: italic; margin-bottom: 1rem; }
+
+  /* ── Buttons ── */
+  .btn-row { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 2rem; }
+
+  .btn {
+    font-family: Georgia, serif;
+    font-size: .8rem;
+    border: 1px solid #000;
+    background: #fff;
+    color: #000;
+    padding: .38rem .9rem;
+    cursor: pointer;
+  }
+  .btn:hover { background: #000; color: #fff; }
+  .btn:active { opacity: .7; }
+
+  .btn-generate {
+    background: #000;
+    color: #fff;
+    padding: .38rem 1.4rem;
+    font-size: .85rem;
+  }
+  .btn-generate:hover { background: #333; }
+
+  /* ── Results ── */
+  #results { margin-top: .5rem; }
+  #results-inner { display: flex; flex-direction: column; gap: 1.4rem; }
+
+  /* ── Stat block ── */
+  .stat-block { border: 1px solid #000; }
+
+  .sb-header {
+    background: #000;
+    color: #fff;
+    padding: .45rem .8rem;
+    display: flex;
+    align-items: baseline;
+    gap: .7rem;
+  }
+  .sb-name { font-size: 1rem; font-weight: bold; }
+  .sb-hd   { font-size: .75rem; opacity: .75; }
+
+  .sb-body { padding: .65rem .8rem; }
+
+  /* two-column stat grid */
+  .sb-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border-top: 1px solid #000;
+    border-left: 1px solid #000;
+    margin-bottom: .6rem;
+  }
+  .sb-cell {
+    border-right: 1px solid #000;
+    border-bottom: 1px solid #000;
+    padding: .2rem .45rem;
+    font-size: .85rem;
+  }
+  .sb-cell-label {
+    font-size: .62rem;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: #555;
+    display: block;
+  }
+  .sb-cell-val { font-weight: bold; }
+
+  /* full-width cell for notes */
+  .sb-cell.full { grid-column: 1 / -1; }
+  .sb-cell-val.normal { font-weight: normal; font-style: italic; font-size: .82rem; }
+
+  .sb-divider { height: 1px; background: #000; margin: .5rem 0; }
+
+  /* ── Instance HP list ── */
+  .instance-list { margin-top: .6rem; }
+  .instance-list-title {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: #555;
+    margin-bottom: .4rem;
+  }
+  .instance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: .3rem;
+  }
+  .instance-card {
+    border: 1px solid #ccc;
+    padding: .22rem .5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: .85rem;
+  }
+  .instance-label { color: #555; font-size: .75rem; }
+  .instance-hp { font-weight: bold; }
+  .hp-unit { color: #555; font-size: .7rem; }
+
+  /* ── Error ── */
+  .error-msg {
+    border: 1px solid #000;
+    background: #f0f0f0;
+    padding: .4rem .7rem;
+    font-size: .85rem;
+    margin-bottom: .6rem;
+  }
+
+  @media (max-width: 520px) {
+    .sb-grid { grid-template-columns: 1fr; }
+    .sb-cell.full { grid-column: 1; }
+    .encounter-row { flex-wrap: wrap; }
+    .qty-input { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Random Encounter Generator</h1>
+  <p class="subtitle">Basic Fantasy RPG — build an encounter then click Generate to roll hit points.</p>
+
+  <h2>Encounter Composition</h2>
+
+  <div id="encounter-rows"></div>
+
+  <p class="hint">Quantity: fixed number (e.g. 3) or dice notation (e.g. 2d6, 1d4+2).</p>
+
+  <div class="btn-row">
+    <button class="btn" id="add-row-btn">+ Add Monster</button>
+    <button class="btn" id="clear-btn">Clear All</button>
+    <button class="btn btn-generate" id="generate-btn">Generate Encounter</button>
+  </div>
+
+  <div id="results" style="display:none;">
+    <h2>Encounter Results</h2>
+    <div id="results-inner"></div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const MONSTERS_URL = 'monsters.json';
+let monstersData = [];
+let rowCount = 0;
+
+// ── Dice ──────────────────────────────────────────────────────────────────────
+function rollDie(sides) {
+  return Math.floor(Math.random() * sides) + 1;
+}
+
+/**
+ * Parse and roll a dice expression.
+ * Supports: "3", "2d6", "1d8+3", "3d6-1"
+ * minResult: floor applied to the final result (1 for HP, 1 for quantity).
+ */
+function rollExpression(expr, minResult) {
+  expr = String(expr).trim().replace(/\s/g, '');
+  const floor = (minResult !== undefined) ? minResult : 0;
+
+  if (/^-?\d+$/.test(expr)) {
+    return { result: Math.max(floor, parseInt(expr, 10)) };
+  }
+
+  const m = expr.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
+  if (!m) return null;
+
+  const num   = parseInt(m[1], 10);
+  const sides = parseInt(m[2], 10);
+  const mod   = m[3] ? parseInt(m[3], 10) : 0;
+  let total = mod;
+  for (let i = 0; i < num; i++) total += rollDie(sides);
+  return { result: Math.max(floor, total) };
+}
+
+/**
+ * Roll HP for a Basic Fantasy monster.
+ * Hit dice are always d8s. HD field examples: "1", "2+2", "3+1", "1-1", "1/2", "3*", "6+3*"
+ * Strip asterisks, parse NdX±bonus, roll, enforce minimum of 1.
+ */
+function rollMonsterHP(monster) {
+  // Half HD (kobold-style): 1d4
+  if (monster.hdHalf) {
+    return Math.max(1, rollDie(4));
+  }
+
+  const num   = monster.hdNum   || 1;
+  const bonus = monster.hdBonus || 0;
+
+  let total = bonus;
+  for (let i = 0; i < num; i++) total += rollDie(8);
+  return Math.max(1, total);
+}
+
+// ── Build monster select ───────────────────────────────────────────────────────
+function buildSelect() {
+  const sel = document.createElement('select');
+  monstersData.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.name;
+    opt.textContent = `${m.name} (HD ${m.HD})`;
+    sel.appendChild(opt);
+  });
+  return sel;
+}
+
+// ── Add an encounter row ───────────────────────────────────────────────────────
+function addRow() {
+  const id = ++rowCount;
+  const row = document.createElement('div');
+  row.className = 'encounter-row';
+  row.dataset.rowId = id;
+
+  const labelM = document.createElement('label');
+  labelM.textContent = 'Monster';
+  labelM.setAttribute('for', `monster-${id}`);
+
+  const sel = buildSelect();
+  sel.id = `monster-${id}`;
+
+  const labelQ = document.createElement('label');
+  labelQ.textContent = 'Qty';
+  labelQ.setAttribute('for', `qty-${id}`);
+
+  const qty = document.createElement('input');
+  qty.type = 'text';
+  qty.id = `qty-${id}`;
+  qty.className = 'qty-input';
+  qty.value = '1';
+  qty.placeholder = 'e.g. 2d6';
+
+  const del = document.createElement('button');
+  del.className = 'del-btn';
+  del.textContent = 'Remove';
+  del.addEventListener('click', () => row.remove());
+
+  row.append(labelM, sel, labelQ, qty, del);
+  document.getElementById('encounter-rows').appendChild(row);
+}
+
+// ── Render one stat block ──────────────────────────────────────────────────────
+function renderStatBlock(monster, instances) {
+  const wrap = document.createElement('div');
+  wrap.className = 'stat-block';
+
+  // Header: name + HD
+  const hdr = document.createElement('div');
+  hdr.className = 'sb-header';
+  hdr.innerHTML = `
+    <span class="sb-name">${monster.name}</span>
+    <span class="sb-hd">HD ${monster.HD}</span>
+  `;
+
+  // Body
+  const body = document.createElement('div');
+  body.className = 'sb-body';
+
+  // Stat grid — the canonical BFRPG fields
+  const grid = document.createElement('div');
+  grid.className = 'sb-grid';
+
+  const fields = [
+    { label: 'Armor Class',    val: monster.AC },
+    { label: 'Hit Dice',       val: monster.HD },
+    { label: 'No. of Attacks', val: monster.attacks },
+    { label: 'Damage',         val: monster.damage },
+    { label: 'Movement',       val: monster.movement },
+    { label: 'No. Appearing',  val: monster.appearing },
+    { label: 'Save As',        val: monster.saveAs },
+    { label: 'Morale',         val: monster.morale },
+    { label: 'Treasure Type',  val: monster.treasure },
+    { label: 'XP',             val: monster.XP },
+  ];
+
+  fields.forEach(({ label, val }) => {
+    const cell = document.createElement('div');
+    cell.className = 'sb-cell';
+    cell.innerHTML = `<span class="sb-cell-label">${label}</span><span class="sb-cell-val">${val}</span>`;
+    grid.appendChild(cell);
+  });
+
+  // Notes (special abilities) — full width if present
+  if (monster.notes) {
+    const noteCell = document.createElement('div');
+    noteCell.className = 'sb-cell full';
+    noteCell.innerHTML = `<span class="sb-cell-label">Special</span><span class="sb-cell-val normal">${monster.notes}</span>`;
+    grid.appendChild(noteCell);
+  }
+
+  // Divider before HP list
+  const div = document.createElement('div');
+  div.className = 'sb-divider';
+
+  // Per-instance HP
+  const instList = document.createElement('div');
+  instList.className = 'instance-list';
+
+  const listTitle = document.createElement('div');
+  listTitle.className = 'instance-list-title';
+  listTitle.textContent =
+    `${instances.length} ${monster.name}${instances.length !== 1 ? 's' : ''} — Rolled Hit Points`;
+
+  const instGrid = document.createElement('div');
+  instGrid.className = 'instance-grid';
+
+  instances.forEach((hp, i) => {
+    const card = document.createElement('div');
+    card.className = 'instance-card';
+    card.innerHTML = `
+      <span class="instance-label">${monster.name} #${i + 1}</span>
+      <span><span class="instance-hp">${hp}</span> <span class="hp-unit">hp</span></span>
+    `;
+    instGrid.appendChild(card);
+  });
+
+  instList.append(listTitle, instGrid);
+  body.append(grid, div, instList);
+  wrap.append(hdr, body);
+  return wrap;
+}
+
+// ── Generate encounter ─────────────────────────────────────────────────────────
+function generate() {
+  const resultsEl = document.getElementById('results');
+  const inner     = document.getElementById('results-inner');
+  inner.innerHTML = '';
+
+  const rows = document.querySelectorAll('.encounter-row');
+  if (rows.length === 0) {
+    showError('Add at least one monster row before generating.', inner);
+    resultsEl.style.display = 'block';
+    return;
+  }
+
+  const errors  = [];
+  const entries = [];
+
+  rows.forEach(row => {
+    const sel      = row.querySelector('select');
+    const qtyInput = row.querySelector('input[type="text"]');
+    const monster  = monstersData.find(m => m.name === sel.value);
+    if (!monster) { errors.push(`Unknown monster: ${sel.value}`); return; }
+
+    const qtyRoll = rollExpression(qtyInput.value || '1', 1);
+    if (!qtyRoll) {
+      errors.push(`Invalid quantity "${qtyInput.value}" for ${monster.name}.`);
+      return;
+    }
+
+    const instances = [];
+    for (let i = 0; i < qtyRoll.result; i++) {
+      instances.push(rollMonsterHP(monster));   // minimum 1 enforced inside
+    }
+    entries.push({ monster, instances });
+  });
+
+  errors.forEach(e => showError(e, inner));
+  entries.forEach(({ monster, instances }) =>
+    inner.appendChild(renderStatBlock(monster, instances)));
+
+  if (entries.length > 0 || errors.length > 0) {
+    resultsEl.style.display = 'block';
+    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function showError(msg, container) {
+  const div = document.createElement('div');
+  div.className = 'error-msg';
+  div.textContent = msg;
+  container.appendChild(div);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const res = await fetch(MONSTERS_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    monstersData = await res.json();
+  } catch (err) {
+    console.error('Could not load monsters.json, using inline fallback.', err);
+    monstersData = [
+      {"name":"Goblin","AC":"14","HD":"1-1","hdNum":1,"hdBonus":-1,"attacks":"1 weapon","damage":"1d6 or by weapon","movement":"20'","appearing":"2d4, Wild 6d10","saveAs":"Fighter: 1","morale":"7","treasure":"R","XP":"13","notes":"Suffer -1 to attacks in full daylight. Darkvision 30'."},
+      {"name":"Orc","AC":"13","HD":"1","hdNum":1,"hdBonus":0,"attacks":"1 weapon","damage":"1d6 or by weapon","movement":"30'","appearing":"2d4, Wild 3d6","saveAs":"Fighter: 1","morale":"8","treasure":"D","XP":"25","notes":"Suffer -1 to attacks in bright sunlight. Darkvision 60'."}
+    ];
+  }
+
+  monstersData.sort((a, b) => a.name.localeCompare(b.name));
+  addRow();
+
+  document.getElementById('add-row-btn').addEventListener('click', addRow);
+  document.getElementById('generate-btn').addEventListener('click', generate);
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    document.getElementById('encounter-rows').innerHTML = '';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('results-inner').innerHTML = '';
+    rowCount = 0;
+    addRow();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
