@@ -126,39 +126,45 @@
     padding: .45rem .8rem;
     display: flex;
     align-items: baseline;
-    gap: .7rem;
+    gap: .8rem;
+    flex-wrap: wrap;
   }
   .sb-name { font-size: 1rem; font-weight: bold; }
-  .sb-hd   { font-size: .75rem; opacity: .75; }
+  .sb-header-meta { font-size: .75rem; opacity: .75; white-space: nowrap; }
+  .sb-header-meta span { margin-right: .6rem; }
+  .sb-header-meta span:last-child { margin-right: 0; }
 
-  .sb-body { padding: .65rem .8rem; }
+  .sb-body { padding: .55rem .8rem; }
 
-  /* two-column stat grid */
+  /* stat table rows */
   .sb-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
     gap: 0;
     border-top: 1px solid #000;
     border-left: 1px solid #000;
     margin-bottom: .6rem;
   }
+  /* row 1: 4 columns */
+  .sb-grid.row1 { grid-template-columns: repeat(4, 1fr); }
+  /* row 2: 4 columns */
+  .sb-grid.row2 { grid-template-columns: repeat(4, 1fr); border-top: none; }
+  /* row 3: special — full width */
+  .sb-grid.row3 { grid-template-columns: 1fr; border-top: none; }
+
   .sb-cell {
     border-right: 1px solid #000;
     border-bottom: 1px solid #000;
-    padding: .2rem .45rem;
+    padding: .18rem .45rem;
     font-size: .85rem;
   }
   .sb-cell-label {
-    font-size: .62rem;
+    font-size: .6rem;
     text-transform: uppercase;
     letter-spacing: .09em;
     color: #555;
     display: block;
   }
   .sb-cell-val { font-weight: bold; }
-
-  /* full-width cell for notes */
-  .sb-cell.full { grid-column: 1 / -1; }
   .sb-cell-val.normal { font-weight: normal; font-style: italic; font-size: .82rem; }
 
   .sb-divider { height: 1px; background: #000; margin: .5rem 0; }
@@ -199,8 +205,8 @@
   }
 
   @media (max-width: 520px) {
-    .sb-grid { grid-template-columns: 1fr; }
-    .sb-cell.full { grid-column: 1; }
+    .sb-grid.row1 { grid-template-columns: repeat(2, 1fr); }
+    .sb-grid.row2 { grid-template-columns: repeat(2, 1fr); }
     .encounter-row { flex-wrap: wrap; }
     .qty-input { width: 100%; }
   }
@@ -332,59 +338,66 @@ function addRow() {
 }
 
 // ── Render one stat block ──────────────────────────────────────────────────────
+function makeCell(label, val, normal) {
+  const cell = document.createElement('div');
+  cell.className = 'sb-cell';
+  cell.innerHTML = `<span class="sb-cell-label">${label}</span><span class="sb-cell-val${normal ? ' normal' : ''}">${val}</span>`;
+  return cell;
+}
+
+function makeGrid(cls, cells) {
+  const grid = document.createElement('div');
+  grid.className = `sb-grid ${cls}`;
+  cells.forEach(c => grid.appendChild(c));
+  return grid;
+}
+
 function renderStatBlock(monster, instances) {
   const wrap = document.createElement('div');
   wrap.className = 'stat-block';
 
-  // Header: name + HD
+  // Header: name · HD · Morale · XP
   const hdr = document.createElement('div');
   hdr.className = 'sb-header';
   hdr.innerHTML = `
     <span class="sb-name">${monster.name}</span>
-    <span class="sb-hd">HD ${monster.HD}</span>
+    <span class="sb-header-meta">
+      <span>Morale ${monster.morale}</span>
+      <span>XP ${monster.XP}</span>
+    </span>
   `;
 
   // Body
   const body = document.createElement('div');
   body.className = 'sb-body';
 
-  // Stat grid — the canonical BFRPG fields
-  const grid = document.createElement('div');
-  grid.className = 'sb-grid';
+  // Row 1: Movement · AC · No. of Attacks · Damage  (4 cols)
+  const grid1 = makeGrid('row1', [
+    makeCell('Movement',       monster.movement),
+    makeCell('Armor Class',    monster.AC),
+    makeCell('No. of Attacks', monster.attacks),
+    makeCell('Damage',         monster.damage),
+  ]);
 
-  const fields = [
-    { label: 'Armor Class',    val: monster.AC },
-    { label: 'Hit Dice',       val: monster.HD },
-    { label: 'No. of Attacks', val: monster.attacks },
-    { label: 'Damage',         val: monster.damage },
-    { label: 'Movement',       val: monster.movement },
-    { label: 'No. Appearing',  val: monster.appearing },
-    { label: 'Save As',        val: monster.saveAs },
-    { label: 'Morale',         val: monster.morale },
-    { label: 'Treasure Type',  val: monster.treasure },
-    { label: 'XP',             val: monster.XP },
-  ];
+  // Row 2: No. Appearing · Save As · Treasure Type · Hit Dice  (4 cols)
+  const grid2 = makeGrid('row2', [
+    makeCell('No. Appearing', monster.appearing),
+    makeCell('Save As',       monster.saveAs),
+    makeCell('Treasure',      monster.treasure),
+    makeCell('Hit Dice',      monster.HD),
+  ]);
 
-  fields.forEach(({ label, val }) => {
-    const cell = document.createElement('div');
-    cell.className = 'sb-cell';
-    cell.innerHTML = `<span class="sb-cell-label">${label}</span><span class="sb-cell-val">${val}</span>`;
-    grid.appendChild(cell);
-  });
-
-  // Notes (special abilities) — full width if present
+  // Row 3: Special (only if present, full width)
+  const grids = [grid1, grid2];
   if (monster.notes) {
-    const noteCell = document.createElement('div');
-    noteCell.className = 'sb-cell full';
-    noteCell.innerHTML = `<span class="sb-cell-label">Special</span><span class="sb-cell-val normal">${monster.notes}</span>`;
-    grid.appendChild(noteCell);
+    grids.push(makeGrid('row3', [ makeCell('Special', monster.notes, true) ]));
   }
 
   // Divider before HP list
   const div = document.createElement('div');
   div.className = 'sb-divider';
 
-  // Per-instance HP
+  // Per-instance HP (unchanged)
   const instList = document.createElement('div');
   instList.className = 'instance-list';
 
@@ -407,7 +420,7 @@ function renderStatBlock(monster, instances) {
   });
 
   instList.append(listTitle, instGrid);
-  body.append(grid, div, instList);
+  body.append(...grids, div, instList);
   wrap.append(hdr, body);
   return wrap;
 }
